@@ -36,10 +36,10 @@ async function main(): Promise<void> {
   startWorker();
 
   // Start server
-  server.listen(config.port, () => {
+  server.listen(config.port, '0.0.0.0', () => {
     console.log(`🚀 VedaAI Backend running on port ${config.port}`);
-    console.log(`📡 WebSocket available at ws://localhost:${config.port}/ws`);
-    console.log(`🔗 API available at http://localhost:${config.port}/api`);
+    console.log(`📡 WebSocket available at ws://0.0.0.0:${config.port}/ws`);
+    console.log(`🔗 API available at http://0.0.0.0:${config.port}/api`);
   });
 }
 
