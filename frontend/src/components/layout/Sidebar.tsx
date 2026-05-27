@@ -13,7 +13,7 @@ export default function Sidebar() {
   const menuItems = [
     {
       name: 'Home',
-      path: '/dashboard',
+      path: '/',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="7" height="9" />

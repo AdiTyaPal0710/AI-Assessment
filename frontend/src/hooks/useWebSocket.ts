@@ -8,9 +8,16 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:5000/ws';
 export function useWebSocket(onMessage: (msg: WSMessage) => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+  const onMessageRef = useRef(onMessage);
+
+  // Keep the callback ref updated without causing reconnections
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const ws = new WebSocket(WS_URL);
 
@@ -21,24 +28,23 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data) as WSMessage;
-        onMessage(data);
+        onMessageRef.current(data);
       } catch (err) {
         console.error('Invalid WebSocket message:', err);
       }
     };
 
     ws.onclose = () => {
-      console.log('🔌 WebSocket disconnected, reconnecting...');
+      wsRef.current = null;
       reconnectTimeout.current = setTimeout(connect, 3000);
     };
 
-    ws.onerror = (err) => {
-      console.error('WebSocket error:', err);
+    ws.onerror = () => {
       ws.close();
     };
 
     wsRef.current = ws;
-  }, [onMessage]);
+  }, []); // No dependencies — stable function reference
 
   const subscribe = useCallback((assignmentId: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -56,6 +62,7 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
         clearTimeout(reconnectTimeout.current);
       }
       wsRef.current?.close();
+      wsRef.current = null;
     };
   }, [connect]);
 

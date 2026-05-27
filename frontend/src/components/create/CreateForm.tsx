@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAssignmentStore } from '@/store/useAssignmentStore';
 import Header from '../layout/Header';
@@ -22,6 +22,34 @@ export default function CreateForm() {
   const [classGrade, setClassGrade] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (file: File) => {
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMsg('Only PDF, JPEG, and PNG files are allowed.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMsg('File size must be under 10MB.');
+      return;
+    }
+    setErrorMsg('');
+    setUploadedFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
   // Dynamic calculations
   const totalQuestions = formData.questionTypes.reduce((acc, curr) => acc + curr.count, 0);
@@ -177,31 +205,71 @@ export default function CreateForm() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
             gap: '24px'
           }}>
-            {/* Upload Area Visualizer */}
+            {/* Upload Area */}
             <div className="form-group">
               <label className="form-label">Upload Reference Material (Optional)</label>
-              <div style={{
-                border: '2px dashed var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                padding: '30px 20px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-                backgroundColor: 'var(--app-bg)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+              />
+              <div
+                style={{
+                  border: '2px dashed var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '30px 20px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'var(--transition)',
+                  backgroundColor: 'var(--app-bg)'
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
               >
-                <div style={{ fontSize: '32px', marginBottom: '8px' }}>☁️</div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
-                  Choose a file or drag & drop it here
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  JPEG, PNG, PDF upto 10MB
-                </div>
-                <button type="button" className="btn btn-secondary" style={{ marginTop: '16px', padding: '6px 14px', fontSize: '12px' }}>
-                  Browse Files
-                </button>
+                {uploadedFile ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '32px' }}>📄</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                      {uploadedFile.name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ marginTop: '8px', padding: '6px 14px', fontSize: '12px' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUploadedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                    >
+                      ✕ Remove File
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>☁️</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                      Choose a file or drag & drop it here
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      JPEG, PNG, PDF upto 10MB
+                    </div>
+                    <button type="button" className="btn btn-secondary" style={{ marginTop: '16px', padding: '6px 14px', fontSize: '12px' }}>
+                      Browse Files
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 

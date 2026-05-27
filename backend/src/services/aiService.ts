@@ -1,22 +1,34 @@
+// src/services/aiService.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env';
 import { IAssignment } from '../models/Assignment';
 
+// Initialize the Google Generative AI SDK
 const genAI = config.geminiApiKey
   ? new GoogleGenerativeAI(config.geminiApiKey)
   : null;
 
+/**
+ * Calls the Gemini API to generate the assignment structure.
+ * Configured specifically to enforce unique questions and return strict JSON.
+ */
 export async function generateWithGemini(prompt: string): Promise<string> {
   if (!genAI) {
     throw new Error('MISSING_API_KEY');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    systemInstruction: "You are an expert academic examiner. You must generate a highly structured exam paper based on the provided parameters. CRITICAL: Every single question must be 100% unique. Do not repeat scenarios, numerical values, or wording across questions. Return the response ONLY as a valid JSON object.",
+    generationConfig: {
+      temperature: 0.8, // High temperature to encourage variety and prevent looping/repetition bias
+      responseMimeType: "application/json", // Forces Gemini to return pure JSON without markdown code blocks
+    }
+  });
+
   const result = await model.generateContent(prompt);
   const response = result.response;
-  const text = response.text();
-
-  return text;
+  return response.text();
 }
 
 /**
@@ -41,18 +53,21 @@ export function generateMockQuestionPaper(assignment: IAssignment): any {
       let text = '';
       let answer = '';
 
+      const randomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const topic = assignment.title ? assignment.title : 'the core syllabus';
+
       if (qt.type.includes('Multiple Choice')) {
-        text = `Which of the following best defines a key concept in ${assignment.subject}? A) Primary observation, B) Auxiliary parameter, C) Theoretical constant, D) Experimental variable.`;
-        answer = 'Option A is correct because the primary observation forms the initial ground truth for academic formulation.';
+        text = `[ID: ${randomId}] Regarding ${topic} in ${assignment.subject}, which of the following is most accurate? A) Primary parameter, B) Secondary node, C) Constant variable, D) None of the above.`;
+        answer = `Option A is correct based on the fundamental rules of ${topic}.`;
       } else if (qt.type.includes('Short')) {
-        text = `Explain the primary function and significance of a critical element in ${assignment.subject}. What are its real-world implications?`;
-        answer = 'The critical element serves to regulate state transitions. Real-world implications include higher operational efficiency and predictable system parameters.';
+        text = `[ID: ${randomId}] Briefly explain the primary function of ${topic} within the context of ${assignment.subject}.`;
+        answer = `It serves to regulate state transitions for ${topic}, ensuring operational efficiency.`;
       } else if (qt.type.includes('Numerical') || qt.type.includes('Diagram')) {
-        text = `Solve the following equation or interpret the key layout: Given a system of parameters with input = 45 and efficiency = 80%, calculate the net output value in ${assignment.subject}.`;
-        answer = 'Formula: Net Output = Input * Efficiency. Thus, Net Output = 45 * 0.8 = 36 units. Showing step-by-step resolution.';
+        text = `[ID: ${randomId}] Given a system based on ${topic} with input = ${Math.floor(Math.random() * 100)} and efficiency = ${Math.floor(Math.random() * 50) + 50}%, calculate the net output value.`;
+        answer = `Formula: Net Output = Input * Efficiency. Step-by-step resolution provided based on ${topic} principles.`;
       } else {
-        text = `Provide a comprehensive critique or analysis regarding current research methodologies used in ${assignment.subject}.`;
-        answer = 'Research methodologies are split into empirical validations and theoretical simulations. Balanced feedback requires both approaches.';
+        text = `[ID: ${randomId}] Provide a comprehensive analysis of how ${topic} affects modern applications of ${assignment.subject}.`;
+        answer = `Balanced feedback requires analyzing both theoretical impacts and practical limitations of ${topic}.`;
       }
 
       questionsList.push({
@@ -96,25 +111,11 @@ export function generateMockQuestionPaper(assignment: IAssignment): any {
 
 /**
  * Parse the LLM response to extract clean JSON.
- * Handles cases where the model wraps JSON in markdown code blocks.
+ * Simplified because generationConfig.responseMimeType handles the markdown stripping naturally.
  */
 export function parseGeneratedJSON(text: string): any {
-  let cleaned = text.trim();
-
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.slice(7);
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.slice(3);
-  }
-
-  if (cleaned.endsWith('```')) {
-    cleaned = cleaned.slice(0, -3);
-  }
-
-  cleaned = cleaned.trim();
-
   try {
-    return JSON.parse(cleaned);
+    return JSON.parse(text);
   } catch (error) {
     console.error('Failed to parse LLM response as JSON:', error);
     console.error('Raw text:', text.substring(0, 500));
